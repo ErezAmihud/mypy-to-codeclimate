@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-import json
 import re
+import json
+import hashlib
 import argparse
 
 line_number_regex = ":(\d+):"
@@ -38,7 +39,7 @@ def analyze(mypy_output:str) -> str:
         if possible_file_name:
             file_name=possible_file_name.group(1)
         else:
-            file_name="unknown"
+            continue
 
         issue_description = re.search(issue_description_error_regex, issue)
         if issue_description is not None:
@@ -52,7 +53,7 @@ def analyze(mypy_output:str) -> str:
                 'type': 'issue',
                 'check_name': 'Static Type Check',
                 'categories': ['Style'],
-
+                'fingerprint': "",
                 'description' : issue_description,
                 "location": {
                     "path":file_name,
@@ -60,6 +61,7 @@ def analyze(mypy_output:str) -> str:
                     },
                 "severity": "info"
                 }
+        codeclimate_json["fingerprint"] = hashlib.md5(json.dumps(codeclimate_json).encode()).digest().hex()
         yield codeclimate_json
 
 def run(input_file: str, output_file: str):
