@@ -1,111 +1,75 @@
 #!/usr/bin/env python3
 
-import glob
 import json
 import re
-import os
-import sys
-from mypy import api
+import argparse
 
 line_number_regex = ":(\d+):"
+extended_line_number_regex = ":(\d+):(\d+):(\d+):(\d+):"
 file_name_regex = "^(.+?):"
 issue_description_error_regex = "error(.*)"
 issue_description_note_regex = "note(.*)"
 # need to add this regex in
 issue_description_warning_regex = "warning(.*)"
 
-try:
-    with open('/config.json') as config_file:
-        config = json.loads(config_file.read())
-except IOError:
-    config = {}
+def get_positions(issue)->dict:
+    possible_extended_line_number = re.search(extended_line_number_regex, issue)
+    if possible_extended_line_number is not None:
+        return {"begin":{"line":possible_extended_line_number.group(1), "column": possible_extended_line_number.group(2)},
+                "end":{"line":possible_extended_line_number.group(3), "column": possible_extended_line_number.group(4)}
+                }
 
-include_paths = config.get('include_paths', ['./'])
-exclude_paths = config.get('exclude_paths', [])
-options = config.get('options', [])
+        
+    possible_line_number = re.search(line_number_regex, issue)
+    line_number = 1
+    if possible_line_number is not None:
+        line_number = possible_line_number.group(1)
 
-def file_path() -> list:
-    python_files = []
+    return {"begin": {"line":line_number, "column":0}, "end":{"line":line_number, "column": 0}}
 
-    for path in include_paths:
-        if path.endswith('.py'):
-            python_files.append(path)
-        for dirname, dirnames, filenames in os.walk(path):
-            for filename in filenames:
-                if filename.endswith('.py'):
-                    python_files.append(os.path.join(dirname, filename))
 
-    for path in exclude_paths:
-        for dirname, dirnames, filenames in os.walk(path):
-            for filename in filenames:
-                if filename.endswith('.py'):
-                    python_files.remove(os.path.join(dirname, filename))
+def analyze(mypy_output:str) -> str:
+    split_issues_on_newline = mypy_output.split('\n')
+    del split_issues_on_newline[-1]
+    for issue in split_issues_on_newline:
+        positions = get_positions(issue)
 
-    for option in options:
-        python_files.insert(0, option)
+        possible_file_name = re.search(file_name_regex, issue)
+        if possible_file_name:
+            file_name=possible_file_name.group(1)
+        else:
+            file_name="unknown"
 
-    return(python_files)
+        issue_description = re.search(issue_description_error_regex, issue)
+        if issue_description is not None:
+            issue_description = issue_description.group(1)
+        elif issue_description is None:
+            issue_description = re.search(issue_description_note_regex, issue).group(1)
+        else:
+            issue_description = re.search(issue_description_warning_regex, issue).group(1)
 
-def analyze(python_files: list) -> str:
-    mypy_output = api.run(python_files)
+        codeclimate_json = {
+                'type': 'issue',
+                'check_name': 'Static Type Check',
+                'categories': ['Style'],
 
-    if mypy_output[0]:
-        successful_results = mypy_output[0]
+                'description' : issue_description,
+                "location": {
+                    "path":file_name,
+                    "positions": positions,
+                    },
+                "severity": "info"
+                }
+        yield codeclimate_json
 
-        split_issues_on_newline = successful_results.split('\n')
-        del split_issues_on_newline[-1]
+def run(input_file: str, output_file: str):
+    json.dump(list(analyze(open(input_file, "r").read())), open(output_file, "w"), indent=4)
 
-        for issue in split_issues_on_newline:
-            line_number = re.search(line_number_regex, issue)
-            if line_number is not None:
-                line_number = line_number.group(1)
-            else:
-                line_number = 1
-
-            file_name = re.search(file_name_regex, issue).group(1)
-
-            issue_description = re.search(issue_description_error_regex, issue)
-            if issue_description is not None:
-                issue_description = issue_description.group(1)
-            elif issue_description is None:
-                issue_description = re.search(issue_description_note_regex, issue).group(1)
-            else:
-                issue_description = re.search(issue_description_warning_regex, issue).group(1)
-
-            codeclimate_json = dict()
-            codeclimate_json['type'] = 'issue'
-            codeclimate_json['check_name'] = 'Static Type Check'
-            codeclimate_json['categories'] = ['Style']
-
-            codeclimate_json['description'] = issue_description
-
-            location = dict()
-            location['path'] = file_name
-            location['positions'] = {
-                'begin': {
-                    'line': int(line_number),
-                    'column': 0,
-                },
-                'end': {
-                    'line': int(line_number),
-                    'column': 0,
-                },
-            }
-
-            codeclimate_json['location'] = location
-            codeclimate_json['severity'] = 'info'
-
-            codeclimate_json_string = json.dumps(codeclimate_json, indent=4)
-            print(codeclimate_json_string + "\0")
-
-    if mypy_output[1]:
-        unsuccessful_result = mypy_output[1]
-
-        print(unsuccessful_result, file=sys.stdout)
-
-python_files = file_path()
-
-if len(python_files) == 0:
-    quit()
-else:
-    analyze(python_files)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("input_file", help="output file created from mypy output")
+    parser.add_argument("output_file", help="The file to write the codeclimate result to")
+    args = parser.parse_args()
+    run(args.input_file, args.output_file)
+if __name__ == "__main__":
+    main()
