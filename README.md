@@ -8,6 +8,8 @@
 
 `python mypy-to-codeclimate in_file.txt out_file.txt`
 
+when running mypy-to-codeclimate.py all the paths in the codeclimate report are relative to the current working directory, so run this on the root of the project. \
+Otherwise gitlab won't parse the paths very well.
 
 ### Also supports
 - The `--show-column-numbers --show-error-end` are supported
