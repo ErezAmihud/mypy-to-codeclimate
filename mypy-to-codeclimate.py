@@ -30,7 +30,7 @@ def get_positions(issue)->dict:
 
 
 def analyze(mypy_output:str) -> str:
-    split_issues_on_newline = mypy_output.split('\n')
+    split_issues_on_newline = mypy_output.strip().split('\n')
     del split_issues_on_newline[-1]
     for issue in split_issues_on_newline:
         positions = get_positions(issue)
@@ -59,7 +59,7 @@ def analyze(mypy_output:str) -> str:
                     "path":file_name,
                     "positions": positions,
                     },
-                "severity": "info"
+                "severity": "major"
                 }
         codeclimate_json["fingerprint"] = hashlib.md5(json.dumps(codeclimate_json).encode()).digest().hex()
         yield codeclimate_json
