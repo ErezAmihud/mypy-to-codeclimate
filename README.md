@@ -5,6 +5,7 @@
 ### Run
 
 `mypy --show-error-end --show-absolute-path`
+
 `python mypy-to-codeclimate in_file.txt out_file.txt`
 
 
