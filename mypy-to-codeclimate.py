@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import re
 import json
 import hashlib
@@ -56,7 +57,7 @@ def analyze(mypy_output:str) -> str:
                 'fingerprint': "",
                 'description' : issue_description,
                 "location": {
-                    "path":file_name,
+                    "path":os.path.relpath(file_name, os.getcwd()),
                     "positions": positions,
                     },
                 "severity": "major"
