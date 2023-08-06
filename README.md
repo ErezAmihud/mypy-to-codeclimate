@@ -14,4 +14,4 @@
 - Fingerprint (like [this mr](https://gitlab.com/ErezAmihud/pyright-to-gitlab-ci/-/merge_requests/2))
 
 # Note
-There are more options like this, like https://pypi.org/project/mypy-gitlab-code-quality/
+There are more options like this, like https://pypi.org/project/mypy-gitlab-code-quality/ but it doesn't support basic things like end line, and specific columns.
